@@ -19,8 +19,9 @@ import (
 func ChatTab() (*fyne.Container, *container.TabItem) {
 	//Create the chat tab
 	chat := container.NewHBox()
+	chat.Refresh()
 
-	bgImage := canvas.NewImageFromFile("icon.png")
+	bgImage := canvas.NewImageFromFile("Icon.png")
 	bgImage.FillMode = canvas.ImageFillOriginal
 	// Create a container for the background image and other content
 	bgContainer := container.NewMax(bgImage)
@@ -31,13 +32,13 @@ func ChatTab() (*fyne.Container, *container.TabItem) {
 	aiGen := container.NewTabItem("Sage Chat", chat)
 	aiGen.Icon = theme.HomeIcon()
 
-	messages1, err := getMessages()
+	messagesFromDB, err := getMessages()
 
 	if err != nil {
 		log.Printf("Error getting messages: %v", err)
 	}
 	//Loop Through Messages From DB and Display
-	for _, message := range messages1 {
+	for _, message := range messagesFromDB {
 		if message.Sender == "YOU" {
 			addChatBubble(chat, message.Content, true)
 		} else {
@@ -50,7 +51,7 @@ func ChatTab() (*fyne.Container, *container.TabItem) {
 		}
 	}
 
-	essentialsGen.StartUpCall(chat)
+	essentialsGen.StartUpCall()
 
 	return chat, aiGen
 }
