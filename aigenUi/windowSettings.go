@@ -1,8 +1,10 @@
-package aigeUi
+package aigenUi
 
-import "fyne.io/fyne/v2"
+import (
+	"fyne.io/fyne/v2"
+)
 
-var WindowSize = fyne.NewSize(960, 540)
+var WindowSize = fyne.NewSize(1200, 1200)
 var MainTitle = "Sage"
 
 // GoodBye No Hate After All, Just Love, Just Love,Bye.
@@ -24,7 +26,7 @@ func GoodBye(mapungubwe fyne.App) func() {
 	return func() {
 		mapungubwe.SendNotification(&fyne.Notification{
 			Title:   "Sage",
-			Content: "Thank you for using Sage Sage",
+			Content: "Thank you for using Sage",
 		})
 		mapungubwe.Quit()
 	}

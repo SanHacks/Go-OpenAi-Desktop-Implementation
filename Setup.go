@@ -1,10 +1,15 @@
 package main
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"strings"
 )
 
+// setup runs scripts to setup environment variables
 func setup() {
 	err := dbInit()
 	if err != nil {
@@ -13,72 +18,103 @@ func setup() {
 	MigrationAssist()
 }
 
+// MigrationAssist Injects All required platform environment variables to environment in use for easy retrieval
 func MigrationAssist() {
-	LockSmith()
-	dbUser := os.Setenv("DB_USER", "")
-	if dbUser != nil {
-		log.Printf("Error setting environment variable: %v", dbUser)
-	}
-	dbPassed := os.Setenv("DB_PASSWORD", "")
-	if dbPassed != nil {
-		log.Printf("Error setting environment variable: %v", dbPassed)
-	}
-	dbHost := os.Setenv("DB_HOST", "")
-	if dbHost != nil {
-		log.Printf("Error setting environment variable: %v", dbHost)
-	}
-	dbName := os.Setenv("DB_NAME", "")
-	if dbName != nil {
-		log.Printf("Error setting environment variable: %v", dbName)
-	}
-	azureSpeechKey := os.Setenv("SPEECH_KEY", speechKeys)
-	if azureSpeechKey != nil {
-		log.Printf("Error setting environment variable: %v", azureSpeechKey)
-	}
-
-	openAiApiKey := os.Setenv("OPENAI", openKeys)
-	if openAiApiKey != nil {
-		log.Printf("Error setting environment variable: %v", openAiApiKey)
-	}
-
+	//Execute Shell Script
+	SetupScripts()
+	setUpPlatformEnvVars()
+	//CollectInstalledApps()
 }
 
-func dbInit() any {
-	extendBase := extensionsSource()
-	if extendBase != nil {
-		log.Println(extendBase)
+type dbFunc func() error
+
+func executeDBFunc(fn dbFunc) {
+	if err := fn(); err != nil {
+		log.Printf("Error creating database: %v", err)
 	}
-	masterBase := createMasterMessages()
-	if masterBase != nil {
-		log.Println(masterBase)
-	}
-	err := createGalleryDatabase()
-	if err != nil {
-		log.Println(err)
-	}
-	errs := createMessagesDatabase()
-	if errs != nil {
-		log.Println(errs)
-	}
-	userBase := createUserDatabase()
-	if userBase != nil {
-		log.Println(userBase)
-	}
-	settingsBase := createSettingsDatabase()
-	if settingsBase != nil {
-		log.Println(settingsBase)
-	}
-	mediaBase := createLocalMediaDatabase()
-	if mediaBase != nil {
-		log.Println(mediaBase)
-	}
-	activityBase := createProductivityDatabase()
-	if activityBase != nil {
-		log.Println(activityBase)
-	}
-	majorKeys := createKeyloggerDatabase()
-	if majorKeys != nil {
-		log.Printf("Error creating database: %v", majorKeys)
-	}
+}
+
+func dbInit() error {
+	executeDBFunc(extensionsSource)
+	executeDBFunc(createMasterMessages)
+	executeDBFunc(createGalleryDatabase)
+	executeDBFunc(createMessagesDatabase)
+	executeDBFunc(createUserDatabase)
+	executeDBFunc(createSettingsDatabase)
+	executeDBFunc(createLocalMediaDatabase)
+	executeDBFunc(createProductivityDatabase)
+	executeDBFunc(createKeyloggerDatabase)
+	executeDBFunc(createLLMSelectionDatabase)
+	executeDBFunc(createSpeechSelectionDatabase)
 	return nil
+}
+
+func SetEnvironmentVariable(key string, tokenValue string) {
+	valueToStore := os.Setenv(key, tokenValue)
+	if valueToStore != nil {
+		log.Printf("Error setting environment variable: %v", valueToStore)
+	}
+}
+
+func _() {
+
+	// Open an SQLite database
+	db, err := sql.Open("sqlite3", "DB/installed_programs.db")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	}(db)
+
+	// Create a table to store program names
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS programs (name TEXT)")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	log.Println(err)
+	// Run a Bash command to list installed programs and capture the output
+	cmd := exec.Command("bash", "-c", "dpkg --get-selections | grep -v deinstall")
+	log.Println(cmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Split the output into lines
+	lines := strings.Split(string(output), "\n")
+	log.Println(lines)
+
+	// Prepare an SQL statement to insert program names
+	stmt, err := db.Prepare("INSERT INTO programs (name) VALUES (?)")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println(stmt)
+	defer func(stmt *sql.Stmt) {
+		err := stmt.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}(stmt)
+
+	// Insert program names into the database
+	for _, line := range lines {
+		if line != "" {
+			program := strings.Fields(line)[0]
+			_, err := stmt.Exec(program)
+			log.Println(program)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+
+	fmt.Println("Installed programs have been stored in the SQLite database.")
 }

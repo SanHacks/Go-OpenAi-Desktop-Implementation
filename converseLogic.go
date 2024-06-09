@@ -2,16 +2,35 @@ package main
 
 import (
 	"aigen/aigenRest"
-	"fyne.io/fyne/v2"
 	"log"
+
+	"fyne.io/fyne/v2"
 )
 
 // Default logic to handle communication with GPT
 func defaultCallConverseLogic(message string, tab1 *fyne.Container) {
-
 	//message = longTermMemory(message)
+	model, err := getSelectedModel()
+	if err != nil {
+		log.Println(err)
+	}
 
-	messageCall, err := aigenRest.MakeApiCall(message)
+	var messageCall string
+	var code error
+
+	switch model {
+	case "OpenAI", "":
+		messageCall, code = aigenRest.MakeApiCall(message)
+	case "Claude":
+		messageCall, code = aigenRest.CallClaude(message)
+	case "Ollama":
+		messageCall, code = aigenRest.CallOllama(message)
+	}
+
+	if code != nil {
+		log.Printf("Error making API call: %v", code)
+	}
+
 	limit := 120
 	notificationMessage := messageCall
 
@@ -65,33 +84,32 @@ func imageGenerationLogic(message string, tab1 *fyne.Container) {
 	if len(notificationMessage) > limit {
 		notificationMessage = notificationMessage[:limit]
 	}
-
+	//Send notifications after operation
 	aigenRest.SendNotificationNow("Image Generated Successfully For:" + notificationMessage)
 
 	log.Printf("Message call: %v", messageCall)
 	if err != nil {
 		log.Printf("Error making API call: %v", err)
 	}
+
 	botMessages(messageCall, err, tab1, "image")
-
-	//TODO: Add image to database properly
-
 	addBotMessages := addMessageWithMedia("Bot", message, "none", messageCall)
 	if addBotMessages != nil {
 		log.Printf("Error adding bot message: %v", addBotMessages)
 	}
 }
 
-// Handle Twitter Push Logic
+// Handles Text Detected As Tweet Generation
+// twitterPushLogic pushes post to X after processing
 func twitterPushLogic(message string, tab1 *fyne.Container) {
 	messageCall, err := aigenRest.MakeApiCall(message)
 	limit := 280
-	sendToTwitter, sentSuccess := aigenRest.SendTweet(messageCall)
-	if sentSuccess != nil {
-		log.Println(sentSuccess)
-		log.Println(sendToTwitter)
-	}
-
+	/*	sendToTwitter, sentSuccess := aigenRest.SendTweet(messageCall)
+		if sentSuccess != nil {
+			log.Println(sentSuccess)
+			log.Println(sendToTwitter)
+		}
+	*/
 	notificationMessage := "Sent Tweet:" + messageCall
 
 	if len(notificationMessage) > limit {
